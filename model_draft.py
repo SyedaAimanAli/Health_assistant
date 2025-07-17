@@ -1,5 +1,6 @@
 import pandas as pd
 import re
+from difflib import get_close_matches
 
 # Load data
 dataset = pd.read_csv("dataset.csv")
@@ -17,9 +18,12 @@ known_symptoms = severities['Symptom'].apply(normalize).unique()
 
 # Match user input symptoms to known symptoms
 def match_symptoms(user_input):
-    raw = [s.strip() for s in user_input.split(',')]
-    cleaned = [normalize(s) for s in raw]
-    matched = [sym for sym in cleaned if sym in known_symptoms]
+    user_symptoms = [normalize(w) for w in re.split(',|;|\n', user_input)]
+    matched = []
+    for symptom in user_symptoms:
+        match = get_close_matches(symptom, known_symptoms, n=1, cutoff=0.7)
+        if match:
+            matched.append(match[0])
     return matched
 
 def predict_disease(user_symptoms):
