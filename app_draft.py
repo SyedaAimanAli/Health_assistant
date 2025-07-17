@@ -1,58 +1,79 @@
 import streamlit as st
-from model_draft import match_symptoms, predict_disease, get_precautions, get_severity
+import numpy as np
 import pandas as pd
 
-# Load symptom data
-severity_df = pd.read_csv("Symptom-severity.csv")
-raw_symptoms = severity_df['Symptom'].dropna().str.strip().str.lower().unique()
+# Set page configuration
+st.set_page_config(page_title="CheckHealth - AI Symptom Checker", page_icon="🩺", layout="centered")
 
-# Format for dropdown
-symptom_display = [sym.replace('_', ' ').title() for sym in raw_symptoms]
-symptom_map = dict(zip(symptom_display, raw_symptoms))
+# Title & Header
+st.image("https://cdn-icons-png.flaticon.com/512/9381/9381449.png", width=80)
+st.title("🩺 CheckHealth: AI Symptom Checker")
+st.caption("Get quick insights based on your symptoms and find suggested remedies.")
 
-# App UI
-st.set_page_config(page_title="Health Assistant", page_icon="🩺")
-st.title("🩺 AI Health Assistant")
-st.markdown("Describe your symptoms below. We’ll predict the most likely disease and provide remedies.")
+# Sample list of symptoms
+symptom_list = [
+    "Fever", "Cough", "Fatigue", "Headache", "Nausea", "Vomiting", "Diarrhea",
+    "Sore throat", "Shortness of breath", "Chest pain", "Rash", "Joint pain",
+    "Loss of appetite", "Chills", "Muscle pain", "Dizziness", "Abdominal pain"
+]
 
-# Dropdown
-selected_display = st.multiselect(
-    "Choose your symptoms:",
-    options=symptom_display,
-    placeholder="Start typing like 'Fever', 'Headache'...",
-)
+# Sample disease prediction logic (for demo purposes)
+disease_map = {
+    frozenset(["Fever", "Cough", "Fatigue"]): ("Flu", ["Rest and drink fluids", "Take fever reducer"]),
+    frozenset(["Headache", "Nausea", "Vomiting"]): ("Migraine", ["Avoid light", "Take prescribed medication"]),
+    frozenset(["Chest pain", "Shortness of breath"]): ("Heart Issue", ["Seek immediate medical attention"]),
+    frozenset(["Diarrhea", "Abdominal pain"]): ("Food Poisoning", ["Stay hydrated", "Eat light food"]),
+}
 
-# ONE button only, one key
-if st.button("Check Health", key="health_button"):
-    if not selected_display:
-        st.warning("Please select at least one symptom.")
-    else:
-        selected_symptoms = [symptom_map[s] for s in selected_display]
-        matched = match_symptoms(','.join(selected_symptoms))
+severity_weights = {
+    "Fever": 2, "Cough": 2, "Fatigue": 1, "Headache": 1, "Nausea": 1, "Vomiting": 2,
+    "Diarrhea": 2, "Sore throat": 1, "Shortness of breath": 4, "Chest pain": 5,
+    "Rash": 1, "Joint pain": 1, "Loss of appetite": 1, "Chills": 2,
+    "Muscle pain": 2, "Dizziness": 3, "Abdominal pain": 2
+}
 
-        if not matched:
-            st.error("No match found. Please select more common symptoms.")
-        else:
-            disease = predict_disease(matched)
-            severity = get_severity(matched)
-            remedies = get_precautions(disease)
+# Tabs for layout
+tabs = st.tabs(["🔍 Select Symptoms", "📋 Results"])
 
-            st.success(f"🔍 **Likely Disease:** {disease}")
-            st.info(f"🧪 **Matched Symptoms:** {', '.join([s.replace('_', ' ').title() for s in matched])}")
-            st.write(f"📊 **Severity Level (0–5):** {round(severity, 2)}")
+with tabs[0]:
+    selected = st.multiselect("Choose up to 5 symptoms:", symptom_list, max_selections=5)
+    st.info("You can select up to 5 symptoms to get a prediction.")
 
+if selected:
+    selected_set = frozenset(selected)
+
+    # Default prediction
+    predicted_disease = "Unknown"
+    remedies = ["No remedy found. Please consult a doctor."]
+
+    # Match a known disease
+    for sym_set, (disease, rem) in disease_map.items():
+        if sym_set.issubset(selected_set):
+            predicted_disease = disease
+            remedies = rem
+            break
+
+    # Calculate average severity
+    severity_score = np.mean([severity_weights.get(sym, 1) for sym in selected])
+    severity_percent = int((severity_score / 5) * 100)
+
+    with tabs[1]:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.success(f"🧠 **Predicted Condition:** {predicted_disease}")
+            st.write(f"🔥 **Severity Level:** {round(severity_score, 2)} / 5")
+            st.progress(severity_percent)
+        with col2:
             st.markdown("### 🩹 Suggested Remedies:")
-            for item in remedies:
-                st.write(f"• {item}")
+            for r in remedies:
+                st.markdown(f"- {r}")
 
-# Optional styling
-st.markdown(
-    """
-    <style>
-    .css-1v0mbdj p {
-        font-size: 16px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+        st.markdown("### 🧩 Your Symptoms:")
+        st.info(", ".join(selected))
+else:
+    with tabs[1]:
+        st.warning("Please select symptoms from the first tab to see results.")
+
+# Footer
+st.markdown("---")
+st.caption("⚠️ This tool is for educational purposes only and not a substitute for professional medical advice.")
